@@ -1,48 +1,53 @@
 ﻿using System;
+using System.Data;
+using Dapper;
 using DapperDemo.Data;
 using DapperDemo.Models;
+using Microsoft.Data.SqlClient;
 
 namespace DapperDemo.Repository
 {
     public class CompanyRepository : ICompanyRepository
     {
-        private readonly ApplicationDbContext _db;
-
-        public CompanyRepository(ApplicationDbContext db)
+        private IDbConnection db;
+        public CompanyRepository(IConfiguration configuration)
         {
-            _db = db;
+            this.db = new SqlConnection(configuration.GetConnectionString("DefaultConnection"));
         }
 
         public Company Add(Company company)
         {
-            _db.Companies.Add(company);
-            _db.SaveChanges();
+            var sql = "INSERT INTO Companies (Name, Address, City, State, PostalCode) VALUES(@Name, @Address, @City, @State, @PostalCode);"
+                        + "SELECT CAST(SCOPE_IDENTITY() as int); ";
+            var id = db.Query<int>(sql, company).Single();
+            company.CompanyId = id;
             return company;
+
         }
 
         public Company Find(int id)
         {
-            //return _db.Companies.FirstOrDefault(c => c.CompanyId == id);
-            return _db.Companies.Find(id);
+            var sql = "SELECT * FROM Companies WHERE CompanyId = @CompanyId";
+            return db.Query<Company>(sql, new { @CompanyId = id }).Single();
         }
 
         public List<Company> GetAll()
         {
-            return _db.Companies.ToList();
+            var sql = "SELECT * FROM Companies";
+            return db.Query<Company>(sql).ToList();
         }
 
         public void Remove(int id)
         {
-            Company company = _db.Companies.FirstOrDefault(u => u.CompanyId == id);
-            _db.Companies.Remove(company);
-            _db.SaveChanges();
-            return;
+            var sql = "DELETE FROM Companies WHERE CompanyId = @Id";
+            db.Execute(sql, new { id });
         }
 
         public Company Update(Company company)
         {
-            _db.Companies.Update(company);
-            _db.SaveChanges();
+            var sql = "UPDATE Companies SET Name = @Name, Address = @Address, City = @City, " +
+                "State = @State, PostalCode = @PostalCode WHERE CompanyId = @CompanyId";
+            db.Execute(sql, company);
             return company;
         }
     }
